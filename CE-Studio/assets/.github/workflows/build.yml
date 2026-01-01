@@ -1,0 +1,71 @@
+name: Build CE Studio
+
+on:
+  push:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller dmgbuild -r requirements.txt
+
+      - name: Build macOS app
+        run: |
+          pyinstaller --windowed --name "CE Studio" "CE Studio.py"
+
+      - name: Create DMG
+        run: |
+          dmgbuild "CE Studio 1.31" CEStudio-1.31.dmg "dist/CE Studio.app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: CEStudio-1.31.dmg
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system deps
+        run: sudo apt update && sudo apt install -y fuse
+
+      - name: Install python deps
+        run: |
+          pip install --upgrade pip
+          pip install pyinstaller -r requirements.txt
+
+      - name: Build Linux binary
+        run: |
+          pyinstaller --onefile --name CEStudio "CE Studio.py"
+
+      - name: Build AppImage
+        run: |
+          mkdir -p CEStudio.AppDir/usr/bin
+          cp dist/CEStudio CEStudio.AppDir/usr/bin/
+
+          echo '#!/bin/sh' > CEStudio.AppDir/AppRun
+          echo 'exec "$(dirname "$0")/usr/bin/CEStudio"' >> CEStudio.AppDir/AppRun
+          chmod +x CEStudio.AppDir/AppRun
+
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage CEStudio.AppDir
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: "*.AppImage"
